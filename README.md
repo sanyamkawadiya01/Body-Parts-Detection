@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # PulseVision AI - Patient Body-Part Localization Dashboard
 
 PulseVision AI is a lightweight, high-performance web application designed to automatically detect and map anatomical body regions from standard patient photographs. Leveraging MediaPipe Pose and OpenCV, it provides bounding box coordinates and visualized diagnostic overlays.
@@ -121,3 +122,5 @@ To integrate this utility into a larger healthcare environment (like a telehealt
    The generated annotated outputs can be converted into standard DICOM images using Python libraries like `pydicom` and uploaded to a hospital's PACS server for medical records keeping.
 4. **Security & HIPAA Compliance**:
    Ensure patient photographs are transmitted over secure HTTPS channels, and implement authentication tokens (JWT or session keys) on the `/detect` endpoint. In production, configure automatic deletion policies on the `uploads/` and `outputs/` directories to prevent retaining Protected Health Information (PHI) longer than required.
+   
+>>>>>>> ac1e028202f89cd1bdca06eb0ab65ebb57e8bea4
