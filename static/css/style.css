@@ -1234,3 +1234,212 @@ footer a:hover {
     color: #ffffff;
     font-weight: 500;
 }
+
+/* --- View Mode Switch Toggle (Body / Anatomy) --- */
+.view-mode-toggle-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.35rem;
+    margin: 0.5rem 0 1rem 0;
+}
+
+.view-mode-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    padding: 0.6rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-family: var(--font-primary);
+}
+
+.view-mode-btn svg {
+    transition: stroke 0.25s ease;
+}
+
+.view-mode-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.view-mode-btn.active {
+    color: var(--accent-teal);
+    background: rgba(0, 242, 254, 0.08);
+    border: 1px solid rgba(0, 242, 254, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    font-weight: 600;
+}
+
+/* --- Internal Organ Custom Color Variables & Dot Indicators --- */
+:root {
+    --color-brain: #ff5e97;
+    --color-heart: #ff3838;
+    --color-lung: #00d2ff;
+    --color-liver: #c54a4a;
+    --color-stomach: #ffd32a;
+}
+
+.brain-dot { background-color: var(--color-brain); box-shadow: 0 0 6px var(--color-brain); }
+.heart-dot { background-color: var(--color-heart); box-shadow: 0 0 6px var(--color-heart); }
+.left_lung-dot { background-color: var(--color-lung); box-shadow: 0 0 6px var(--color-lung); }
+.right_lung-dot { background-color: var(--color-lung); box-shadow: 0 0 6px var(--color-lung); }
+.liver-dot { background-color: var(--color-liver); box-shadow: 0 0 6px var(--color-liver); }
+.stomach-dot { background-color: var(--color-stomach); box-shadow: 0 0 6px var(--color-stomach); }
+
+/* --- Vitals Section Styling --- */
+.vitals-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.vitals-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.vitals-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    transition: background-color 0.2s;
+}
+
+.vitals-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.vitals-card-title {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-family: var(--font-secondary);
+    letter-spacing: 0.5px;
+}
+
+.vitals-card-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.vitals-disclaimer {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.4;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+/* --- Anatomy Mode Overlay (DOM Upload Mode) --- */
+.anatomy-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 15;
+}
+
+.anatomy-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.anatomy-organ-wrapper {
+    position: absolute;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+    opacity: 0.6; /* 50-70% opacity */
+}
+
+/* Layering */
+.anatomy-organ-wrapper[data-organ="left_lung"],
+.anatomy-organ-wrapper[data-organ="right_lung"] {
+    z-index: 1;
+}
+.anatomy-organ-wrapper[data-organ="liver"],
+.anatomy-organ-wrapper[data-organ="stomach"] {
+    z-index: 2;
+}
+.anatomy-organ-wrapper[data-organ="heart"] {
+    z-index: 3;
+}
+.anatomy-organ-wrapper[data-organ="brain"] {
+    z-index: 4;
+}
+
+/* Dynamic color mapping for organ glows */
+.anatomy-organ-wrapper[data-organ="brain"] { --organ-color: var(--color-brain); }
+.anatomy-organ-wrapper[data-organ="heart"] { --organ-color: var(--color-heart); }
+.anatomy-organ-wrapper[data-organ="left_lung"],
+.anatomy-organ-wrapper[data-organ="right_lung"] { --organ-color: var(--color-lung); }
+.anatomy-organ-wrapper[data-organ="liver"] { --organ-color: var(--color-liver); }
+.anatomy-organ-wrapper[data-organ="stomach"] { --organ-color: var(--color-stomach); }
+
+.anatomy-organ-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* Double width scaling for split lungs image */
+.anatomy-organ-wrapper.split-lung {
+    overflow: hidden;
+}
+
+.anatomy-organ-wrapper.split-lung img {
+    width: 200%;
+    max-width: none;
+    height: 100%;
+    object-fit: fill;
+    position: absolute;
+    top: 0;
+}
+
+.anatomy-organ-wrapper[data-organ="right_lung"] img {
+    left: 0;
+}
+
+.anatomy-organ-wrapper[data-organ="left_lung"] img {
+    left: -100%;
+}
+
+/* Hover & Selected animations */
+.anatomy-organ-wrapper:hover {
+    opacity: 0.95;
+    filter: drop-shadow(0 0 15px var(--organ-color, var(--accent-teal))) brightness(1.1);
+    transform: scale(1.05);
+}
+
+.anatomy-organ-wrapper.selected {
+    opacity: 1;
+    filter: drop-shadow(0 0 25px var(--organ-color, var(--accent-teal))) brightness(1.2);
+    transform: scale(1.08);
+    z-index: 10 !important; /* Bring to front when selected */
+}
+

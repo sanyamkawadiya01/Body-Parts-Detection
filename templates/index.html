@@ -150,6 +150,24 @@
                     </div>
                 </div>
 
+                <!-- View Mode Toggle Selectors -->
+                <div class="view-mode-toggle-container">
+                    <button class="view-mode-btn active" id="view-mode-body-btn" type="button">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; display: inline-block; vertical-align: middle;">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        Body Mode
+                    </button>
+                    <button class="view-mode-btn" id="view-mode-anatomy-btn" type="button">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; display: inline-block; vertical-align: middle;">
+                            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/>
+                            <path d="M12 6a6 6 0 1 0 6 6 6 6 0 0 0-6-6zm0 10a4 4 0 1 1 4-4 4 4 0 0 1-4 4z"/>
+                        </svg>
+                        Anatomy Mode
+                    </button>
+                </div>
+
                 <div class="results-wrapper">
                     
                     <!-- 1. Empty State (Initial) -->
@@ -210,13 +228,25 @@
                             
                             <!-- Custom highlight visual overlay mapped in frontend (optional) -->
                             <div class="coord-highlights" id="coord-highlights">
+                                <!-- Body Regions -->
                                 <div class="coord-highlight-box" id="highlight-head"></div>
                                 <div class="coord-highlight-box" id="highlight-chest"></div>
                                 <div class="coord-highlight-box" id="highlight-left_arm"></div>
                                 <div class="coord-highlight-box" id="highlight-right_arm"></div>
                                 <div class="coord-highlight-box" id="highlight-left_leg"></div>
                                 <div class="coord-highlight-box" id="highlight-right_leg"></div>
+                                
+                                <!-- Internal Organs -->
+                                <div class="coord-highlight-box" id="highlight-brain"></div>
+                                <div class="coord-highlight-box" id="highlight-heart"></div>
+                                <div class="coord-highlight-box" id="highlight-left_lung"></div>
+                                <div class="coord-highlight-box" id="highlight-right_lung"></div>
+                                <div class="coord-highlight-box" id="highlight-liver"></div>
+                                <div class="coord-highlight-box" id="highlight-stomach"></div>
                             </div>
+                            
+                            <!-- Anatomy Rendering Layer -->
+                            <div class="anatomy-overlay" id="anatomy-overlay"></div>
                         </div>
 
                         <!-- Right inside result: Coordinates Table and Details -->
