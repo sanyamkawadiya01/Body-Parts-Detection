@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseVision AI - Clinical Patient Body-Part Localization Dashboard</title>
+    <meta name="description" content="Secure patient photograph body-part analysis using MediaPipe Pose. Automated clinical bounding box extraction and pose landmarks estimation for medical integration.">
+    <meta name="author" content="PulseVision Medical Systems">
+    
+    <!-- External stylesheet -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>PulseVision AI</h1>
+                    <p>Body-Part Localization Suite</p>
+                </div>
+            </div>
+            
+            <div class="header-status" id="system-status">
+                <span class="status-dot"></span>
+                <span>Medical Engine Active</span>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="main-grid">
+            
+            <!-- Left Panel: Input & Controls -->
+            <section class="panel-card" id="input-panel" aria-labelledby="upload-heading">
+                <!-- Mode Toggle Selectors -->
+                <div class="mode-toggle-container">
+                    <button class="mode-toggle-btn active" id="mode-upload-btn" type="button">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                        </svg>
+                        Upload Image
+                    </button>
+                    <button class="mode-toggle-btn" id="mode-webcam-btn" type="button">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
+                        Live Webcam
+                    </button>
+                </div>
+
+                <div class="panel-title" id="panel-title-upload">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                    </svg>
+                    <div>
+                        <h2 id="upload-heading">Patient Image Upload</h2>
+                        <p class="panel-subtitle">Select or drop a standard photograph of a patient</p>
+                    </div>
+                </div>
+
+                <div class="panel-title" id="panel-title-webcam" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                    <div>
+                        <h2>Patient Live Webcam</h2>
+                        <p class="panel-subtitle">Position patient within the frame for real-time tracking</p>
+                    </div>
+                </div>
+
+                <div class="upload-wrapper" id="upload-mode-wrapper">
+                    <!-- Drag and Drop Zone -->
+                    <div class="drop-zone" id="drop-zone">
+                        <div class="upload-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 5v14M5 12h14" />
+                            </svg>
+                        </div>
+                        <div class="upload-prompt">
+                            <h3>Drag & drop patient image here</h3>
+                            <p>or click to browse local files</p>
+                            <p>Supports PNG, JPG, JPEG, WEBP, BMP up to 10MB</p>
+                        </div>
+                        <input type="file" id="image-input" accept="image/*">
+                    </div>
+
+                    <!-- File Preview (Visible after selection) -->
+                    <div class="preview-container" id="preview-container">
+                        <img src="" alt="Patient raw preview" class="preview-image" id="preview-img">
+                        <button class="clear-btn" id="clear-btn" aria-label="Remove uploaded image">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                            Clear File
+                        </button>
+                    </div>
+
+                    <!-- Submit action button -->
+                    <button class="btn-primary" id="analyze-btn" disabled>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 6v6l4 2"></path>
+                        </svg>
+                        Run Bounding Box Detection
+                    </button>
+                </div>
+
+                <!-- Webcam Mode Wrapper (Visible only in Webcam Mode) -->
+                <div class="webcam-mode-wrapper" id="webcam-mode-wrapper" style="display: none;">
+                    <div class="webcam-container">
+                        <div class="video-wrapper">
+                            <video id="webcam-element" autoplay playsinline muted></video>
+                            <canvas id="webcam-canvas"></canvas>
+                            <div class="webcam-overlay-message" id="webcam-message">Click 'Live Webcam' above to start camera</div>
+                        </div>
+                        <div class="webcam-controls">
+                            <button class="btn-primary" id="capture-btn" disabled>
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                Capture Clinical Record
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Output & Coordinates Data -->
+            <section class="panel-card" id="output-panel" aria-labelledby="results-heading">
+                <div class="panel-title">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <line x1="9" y1="3" x2="9" y2="21" />
+                        <line x1="15" y1="3" x2="15" y2="21" />
+                        <line x1="3" y1="9" x2="21" y2="9" />
+                        <line x1="3" y1="15" x2="21" y2="15" />
+                    </svg>
+                    <div>
+                        <h2 id="results-heading">Localization Diagnostics</h2>
+                        <p class="panel-subtitle">AI model detection metrics and bounding boxes</p>
+                    </div>
+                </div>
+
+                <div class="results-wrapper">
+                    
+                    <!-- 1. Empty State (Initial) -->
+                    <div class="empty-state" id="empty-state">
+                        <svg viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        <h3>No Active Diagnostics</h3>
+                        <p>Upload a patient photograph and click "Run Bounding Box Detection" to view regional mapping.</p>
+                    </div>
+
+                    <!-- 2. Scanning Loader State -->
+                    <div class="scanning-container" id="scanning-state">
+                        <div class="scanning-visual">
+                            <div class="scan-bar"></div>
+                            <img src="" alt="Scanning raw input" class="scanning-img" id="scanning-img">
+                        </div>
+                        
+                        <div class="scanner-stepper">
+                            <div class="step-item" id="step-upload">
+                                <span class="step-bullet"></span>
+                                <span>Uploading image to clinical sandbox</span>
+                                <span class="step-spinner"></span>
+                            </div>
+                            <div class="step-item" id="step-model">
+                                <span class="step-bullet"></span>
+                                <span>Initializing MediaPipe Pose framework</span>
+                                <span class="step-spinner"></span>
+                            </div>
+                            <div class="step-item" id="step-process">
+                                <span class="step-bullet"></span>
+                                <span>Calculating regional coordinate boundary boxes</span>
+                                <span class="step-spinner"></span>
+                            </div>
+                            <div class="step-item" id="step-finish">
+                                <span class="step-bullet"></span>
+                                <span>Generating visual diagnostic overlays</span>
+                                <span class="step-spinner"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Active Results Completed State -->
+                    <div class="active-results" id="results-state">
+                        
+                        <!-- Left inside result: Annotated image -->
+                        <div class="output-display">
+                            <img src="" alt="Annotated Patient Regions" class="output-img" id="output-img">
+                            <div class="live-telemetry-placeholder" id="live-telemetry-placeholder" style="display: none;">
+                                <div class="pulse-ring"></div>
+                                <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="telemetry-icon">
+                                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                                </svg>
+                                <h3>Live Telemetry Stream</h3>
+                                <p>Position patient and view real-time diagnostics on the left camera feed.</p>
+                            </div>
+                            
+                            <!-- Custom highlight visual overlay mapped in frontend (optional) -->
+                            <div class="coord-highlights" id="coord-highlights">
+                                <div class="coord-highlight-box" id="highlight-head"></div>
+                                <div class="coord-highlight-box" id="highlight-chest"></div>
+                                <div class="coord-highlight-box" id="highlight-left_arm"></div>
+                                <div class="coord-highlight-box" id="highlight-right_arm"></div>
+                                <div class="coord-highlight-box" id="highlight-left_leg"></div>
+                                <div class="coord-highlight-box" id="highlight-right_leg"></div>
+                            </div>
+                        </div>
+
+                        <!-- Right inside result: Coordinates Table and Details -->
+                        <div class="results-info">
+                            <div class="detection-summary-card">
+                                <div class="detection-summary-header">Localization Rate</div>
+                                <div class="detection-summary-count" id="detection-count">0/6 <span>regions mapped</span></div>
+                            </div>
+                            
+                            <div class="table-container">
+                                <table class="metrics-table" id="metrics-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Body Region</th>
+                                            <th>Bounding Box [x1, y1, x2, y2]</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dynamic table rows go here -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="results-actions">
+                                <button class="btn-secondary" id="copy-json-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy Raw JSON
+                                </button>
+                                <a href="" download class="btn-secondary" id="download-img-btn" style="text-decoration:none;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                                    </svg>
+                                    Save Image
+                                </a>
+                                <button class="btn-danger" id="reset-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                                    </svg>
+                                    Scan Another Patient
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Third Panel: Body Part Info Panel -->
+            <section class="panel-card" id="info-panel" aria-labelledby="info-heading">
+                <div class="panel-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <div>
+                        <h2 id="info-heading">Anatomical Analysis</h2>
+                        <p class="panel-subtitle">Regional clinical details and conditions</p>
+                    </div>
+                </div>
+                <div class="info-panel-content" id="info-panel-content">
+                    <div class="info-placeholder">
+                        <div class="pulse-icon">
+                            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                            </svg>
+                        </div>
+                        <h3>Anatomy Explorer</h3>
+                        <p>Select a body part to view information.</p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <div>PulseVision Clinical Suite v1.2.0 • HIPAA Compliant Sandbox Sandbox</div>
+            <div>Powered by <a href="https://github.com/google/mediapipe" target="_blank" rel="noopener noreferrer">MediaPipe Pose</a> & OpenCV</div>
+        </footer>
+
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast" id="toast">
+        <span class="toast-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+        </span>
+        <span id="toast-message">Message text</span>
+    </div>
+
+    <!-- MediaPipe Pose JS Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <!-- External javascript logic -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
