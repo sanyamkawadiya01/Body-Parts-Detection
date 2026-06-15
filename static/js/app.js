@@ -1,4 +1,258 @@
 document.addEventListener('DOMContentLoaded', () => {
+    class OrganOverlay {
+        constructor() {
+            this.assets = {
+                brain: '/static/images/organs/brain.png',
+                heart: '/static/images/organs/heart.png',
+                liver: '/static/images/organs/liver.png',
+                lungs: '/static/images/organs/lungs.png',
+                stomach: '/static/images/organs/stomach.png'
+            };
+            this.images = {};
+            this.loaded = false;
+            this.fadeStartTime = null;
+            this.isFading = false;
+        }
+
+        async preload() {
+            const promises = Object.entries(this.assets).map(([key, src]) => {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.src = src;
+                    img.onload = () => {
+                        const processed = this.ensureTransparency(img, key);
+                        this.images[key] = processed;
+                        if (processed instanceof HTMLCanvasElement) {
+                            this.assets[key] = processed.toDataURL('image/png');
+                        }
+                        resolve();
+                    };
+                    img.onerror = (err) => {
+                        console.error(`Failed to load organ asset: ${src}`, err);
+                        resolve(); // Resolve anyway to not break entire app if one image fails
+                    };
+                });
+            });
+            await Promise.all(promises);
+            this.loaded = true;
+        }
+
+        ensureTransparency(img, name) {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return img;
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0);
+
+                const imgData = ctx.getImageData(0, 0, img.width, img.height);
+                const data = imgData.data;
+
+                // 1. Check transparency ratio
+                let transparentPixels = 0;
+                const totalPixels = img.width * img.height;
+                for (let i = 3; i < data.length; i += 4) {
+                    if (data[i] < 200) {
+                        transparentPixels++;
+                    }
+                }
+                const transparencyRatio = transparentPixels / totalPixels;
+
+                // 2. Sample corner pixels to detect solid backgrounds
+                const getPixel = (x, y) => {
+                    const idx = (y * img.width + x) * 4;
+                    return {
+                        r: data[idx],
+                        g: data[idx+1],
+                        b: data[idx+2],
+                        a: data[idx+3]
+                    };
+                };
+
+                const corners = [
+                    getPixel(0, 0),
+                    getPixel(img.width - 1, 0),
+                    getPixel(0, img.height - 1),
+                    getPixel(img.width - 1, img.height - 1)
+                ];
+
+                const allCornersOpaque = corners.every(p => p.a > 240);
+                const avgR = Math.round(corners.reduce((sum, p) => sum + p.r, 0) / 4);
+                const avgG = Math.round(corners.reduce((sum, p) => sum + p.g, 0) / 4);
+                const avgB = Math.round(corners.reduce((sum, p) => sum + p.b, 0) / 4);
+
+                const colorVariance = corners.reduce((sum, p) => {
+                    return sum + Math.abs(p.r - avgR) + Math.abs(p.g - avgG) + Math.abs(p.b - avgB);
+                }, 0) / 4;
+
+                const hasOpaqueBackground = allCornersOpaque && (colorVariance < 15);
+                const isCorruptedOpaque = transparencyRatio < 0.005;
+
+                if (hasOpaqueBackground || isCorruptedOpaque) {
+                    console.log(`PulseVision AI Dynamic Transparency Engine: Processing organ '${name}'`);
+                    console.log(`Detected background color: rgb(${avgR}, ${avgG}, ${avgB})`);
+
+                    const threshold1 = 20; // Distance threshold for full transparency
+                    const threshold2 = 50; // Distance threshold for soft alpha feathering
+
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i+1];
+                        const b = data[i+2];
+                        const a = data[i+3];
+
+                        const dist = Math.sqrt((r - avgR)**2 + (g - avgG)**2 + (b - avgB)**2);
+
+                        if (dist < threshold1) {
+                            data[i+3] = 0;
+                        } else if (dist < threshold2) {
+                            const ratio = (dist - threshold1) / (threshold2 - threshold1);
+                            const newAlpha = Math.round(a * ratio);
+                            if (newAlpha < data[i+3]) {
+                                data[i+3] = newAlpha;
+                            }
+                        }
+                    }
+                    ctx.putImageData(imgData, 0, 0);
+                    return canvas;
+                }
+                
+                return img;
+            } catch (err) {
+                console.error(`Error processing transparency for ${name}:`, err);
+                return img;
+            }
+        }
+
+        startFade() {
+            this.fadeStartTime = Date.now();
+            this.isFading = true;
+        }
+
+        getFadeOpacity() {
+            if (!this.isFading) return 0.6; // default opacity
+            const elapsed = Date.now() - this.fadeStartTime;
+            const duration = 500; // 500ms fade duration
+            if (elapsed >= duration) {
+                this.isFading = false;
+                return 0.6;
+            }
+            return (elapsed / duration) * 0.6;
+        }
+
+        // Render for static images in DOM
+        renderDOM(container, coordinates, width, height, selectedOrganId, onOrganClick) {
+            if (!this.loaded || !container) return;
+
+            // Ensure container is empty
+            container.innerHTML = '';
+
+            const organsList = ['left_lung', 'right_lung', 'liver', 'stomach', 'heart', 'brain'];
+            const organCoords = getOrganCoordinates(coordinates);
+
+            organsList.forEach(organId => {
+                const bbox = organCoords[organId];
+                if (!bbox) return;
+
+                const [x1, y1, x2, y2] = bbox;
+                const leftPercent = (x1 / width) * 100;
+                const topPercent = (y1 / height) * 100;
+                const widthPercent = ((x2 - x1) / width) * 100;
+                const heightPercent = ((y2 - y1) / height) * 100;
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'anatomy-organ-wrapper';
+                wrapper.dataset.organ = organId;
+                wrapper.style.left = `${leftPercent}%`;
+                wrapper.style.top = `${topPercent}%`;
+                wrapper.style.width = `${widthPercent}%`;
+                wrapper.style.height = `${heightPercent}%`;
+
+                if (organId === selectedOrganId) {
+                    wrapper.classList.add('selected');
+                }
+
+                const img = document.createElement('img');
+                if (organId === 'left_lung' || organId === 'right_lung') {
+                    wrapper.classList.add('split-lung');
+                    img.src = this.assets.lungs;
+                } else {
+                    img.src = this.assets[organId];
+                }
+                img.alt = organId;
+                wrapper.appendChild(img);
+
+                // Click listener
+                wrapper.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (onOrganClick) onOrganClick(organId);
+                });
+
+                container.appendChild(wrapper);
+            });
+        }
+
+        // Render for live webcam on Canvas
+        renderCanvas(ctx, coordinates, canvasWidth, canvasHeight, selectedOrganId) {
+            if (!this.loaded) return;
+
+            const organsList = ['left_lung', 'right_lung', 'liver', 'stomach', 'heart', 'brain'];
+            const organCoords = getOrganCoordinates(coordinates);
+            const opacity = this.getFadeOpacity();
+
+            organsList.forEach(organId => {
+                const bbox = organCoords[organId];
+                if (!bbox) return;
+
+                const [x1, y1, x2, y2] = bbox;
+                const w = x2 - x1;
+                const h = y2 - y1;
+                if (w <= 0 || h <= 0) return;
+
+                const isSelected = organId === selectedOrganId;
+                ctx.save();
+
+                // Set drawing opacity (selected gets 0.95, others get animated/default opacity)
+                ctx.globalAlpha = isSelected ? 0.95 : opacity;
+
+                // Enable high-quality image smoothing
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+
+                // Apply selected glow style on Canvas
+                if (isSelected) {
+                    ctx.shadowColor = organColors[organId] || '#00f2fe';
+                    ctx.shadowBlur = 20;
+                }
+
+                if (organId === 'left_lung' || organId === 'right_lung') {
+                    const img = this.images.lungs;
+                    if (img) {
+                        if (organId === 'right_lung') {
+                            // Left half of image (viewer's left)
+                            ctx.drawImage(img, 0, 0, img.width / 2, img.height, x1, y1, w, h);
+                        } else {
+                            // Right half of image (viewer's right)
+                            ctx.drawImage(img, img.width / 2, 0, img.width / 2, img.height, x1, y1, w, h);
+                        }
+                    }
+                } else {
+                    const img = this.images[organId];
+                    if (img) {
+                        ctx.drawImage(img, x1, y1, w, h);
+                    }
+                }
+
+                ctx.restore();
+            });
+        }
+    }
+
     // 1. DOM Elements
     const dropZone = document.getElementById('drop-zone');
     const imageInput = document.getElementById('image-input');
@@ -21,6 +275,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const webcamMessage = document.getElementById('webcam-message');
     const captureBtn = document.getElementById('capture-btn');
     const liveTelemetryPlaceholder = document.getElementById('live-telemetry-placeholder');
+    const viewModeBodyBtn = document.getElementById('view-mode-body-btn');
+    const viewModeAnatomyBtn = document.getElementById('view-mode-anatomy-btn');
 
     // UI Panel States
     const emptyState = document.getElementById('empty-state');
@@ -55,6 +311,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let originalImageDimensions = { width: 0, height: 0 };
     let currentMode = 'upload'; // 'upload' or 'webcam'
     let selectedBodyPart = null;
+    let currentViewMode = 'body'; // 'body' or 'anatomy'
+    let selectedOrgan = null;
+    const organOverlay = new OrganOverlay();
+    organOverlay.preload().catch(err => console.error("Preloading organs failed", err));
     
     // Webcam stream state
     let webcamStream = null;
@@ -75,6 +335,15 @@ document.addEventListener('DOMContentLoaded', () => {
         right_leg: '#8a2be2'  // Royal Violet
     };
 
+    const organColors = {
+        brain: '#ff5e97',     // Pinkish Red
+        heart: '#ff3838',     // Crimson Red
+        left_lung: '#00d2ff', // Cyan/electric blue
+        right_lung: '#00d2ff',
+        liver: '#c54a4a',     // Brownish red
+        stomach: '#ffd32a'    // Amber gold
+    };
+
     const bodyPartGroups = {
         head: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         chest: [11, 12, 23, 24],
@@ -83,6 +352,34 @@ document.addEventListener('DOMContentLoaded', () => {
         left_leg: [23, 25, 27, 29, 31],
         right_leg: [24, 26, 28, 30, 32]
     };
+
+    const organRelativeBoxes = {
+        brain: { parent: 'head', rx: 0.25, ry: 0.15, rw: 0.5, rh: 0.55 },
+        heart: { parent: 'chest', rx: 0.43, ry: 0.22, rw: 0.14, rh: 0.16 },
+        left_lung: { parent: 'chest', rx: 0.53, ry: 0.15, rw: 0.22, rh: 0.35 },
+        right_lung: { parent: 'chest', rx: 0.25, ry: 0.15, rw: 0.22, rh: 0.35 },
+        liver: { parent: 'chest', rx: 0.25, ry: 0.52, rw: 0.23, rh: 0.15 },
+        stomach: { parent: 'chest', rx: 0.48, ry: 0.52, rw: 0.25, rh: 0.18 }
+    };
+
+    function getOrganCoordinates(parentCoordinates) {
+        if (!parentCoordinates) return {};
+        const organCoords = {};
+        for (const [organId, config] of Object.entries(organRelativeBoxes)) {
+            const parentBox = parentCoordinates[config.parent];
+            if (parentBox) {
+                const [px1, py1, px2, py2] = parentBox;
+                const p_w = px2 - px1;
+                const p_h = py2 - py1;
+                const x1 = Math.round(px1 + config.rx * p_w);
+                const y1 = Math.round(py1 + config.ry * p_h);
+                const x2 = Math.round(x1 + config.rw * p_w);
+                const y2 = Math.round(y1 + config.rh * p_h);
+                organCoords[organId] = [x1, y1, x2, y2];
+            }
+        }
+        return organCoords;
+    }
 
     // Body Part Medical Knowledge Base
     const bodyPartKnowledge = {
@@ -236,11 +533,189 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Organ Medical Knowledge Base
+    const organKnowledge = {
+        brain: {
+            name: "Brain",
+            badge: "Cranial Vault",
+            description: "The primary organ of the human nervous system, serving as the command center for all cognitive, sensory, and motor functions.",
+            functions: [
+                "Processes sensory information (vision, sound, touch, taste, smell).",
+                "Controls voluntary motor movements, coordination, and balance.",
+                "Manages higher cognitive functions including thought, memory, emotion, and speech.",
+                "Regulates autonomic bodily functions (breathing, heart rate, temperature)."
+            ],
+            conditions: [
+                "Stroke (Ischemic/Hemorrhagic CVA)",
+                "Alzheimer's Disease and Dementia",
+                "Traumatic Brain Injury (Concussions)",
+                "Brain Tumors and Meningitis"
+            ],
+            anatomy: [
+                "Cerebrum: Divided into two hemispheres, responsible for reasoning and learning.",
+                "Cerebellum: Situated at the base, coordinates muscle activity and posture.",
+                "Brainstem: Connects to the spinal cord, controlling life-sustaining reflexes."
+            ],
+            vitals: {
+                neuroStatus: "Neurological Status: Normal",
+                consciousness: "Consciousness Level: GCS 15 (Alert/Oriented)"
+            }
+        },
+        heart: {
+            name: "Heart",
+            badge: "Cardiovascular",
+            description: "A muscular organ located in the middle mediastinum that acts as a dual-pump to circulate blood throughout the body.",
+            functions: [
+                "Pumps oxygenated blood to body tissues via the systemic circulation.",
+                "Sends deoxygenated blood to the lungs for gas exchange via pulmonary circulation.",
+                "Maintains systemic blood pressure and regulates blood flow velocity."
+            ],
+            conditions: [
+                "Coronary Artery Disease",
+                "Heart Failure",
+                "Arrhythmia",
+                "Myocardial Infarction (Heart Attack)"
+            ],
+            anatomy: [
+                "Atria: Upper chambers (left and right) receiving incoming blood.",
+                "Ventricles: Lower chambers (left and right) pumping blood out.",
+                "Myocardium: The thick muscular middle layer responsible for contractions."
+            ],
+            vitals: {
+                rate: "Heart Rate: 72 bpm",
+                pressure: "Blood Pressure: 120/80 mmHg",
+                cardiacStatus: "Cardiac Status: Normal Sinus Rhythm"
+            }
+        },
+        left_lung: {
+            name: "Left Lung",
+            badge: "Respiratory",
+            description: "The left respiratory organ situated in the thoracic cavity, slightly smaller than the right to accommodate the heart.",
+            functions: [
+                "Facilitates inhalation of oxygen and exhalation of carbon dioxide.",
+                "Assists in maintaining the body's acid-base balance (pH regulation).",
+                "Filters out minor blood clots and air bubbles from circulation."
+            ],
+            conditions: [
+                "Pneumonia",
+                "Chronic Obstructive Pulmonary Disease (COPD)",
+                "Asthma",
+                "Pneumothorax (Collapsed Lung)"
+            ],
+            anatomy: [
+                "Superior & Inferior Lobes: Two lobes divided by the oblique fissure.",
+                "Cardiac Notch: A concave indentation on the anterior border accommodating the apex of the heart.",
+                "Alveoli: Tiny air sacs where microscopic gas exchange occurs."
+            ],
+            vitals: {
+                oxygen: "Oxygen Saturation: 98%",
+                respRate: "Respiratory Rate: 16 br/min",
+                lungStatus: "Lung Status: Clear Bilaterally"
+            }
+        },
+        right_lung: {
+            name: "Right Lung",
+            badge: "Respiratory",
+            description: "The right respiratory organ situated in the thoracic cavity, larger and heavier than the left lung.",
+            functions: [
+                "Facilitates intake of oxygen and disposal of carbon dioxide.",
+                "Assists in pH blood regulation and respiration mechanics.",
+                "Filters out microemboli from pulmonary venous flow."
+            ],
+            conditions: [
+                "Pneumonia",
+                "COPD and Emphysema",
+                "Asthma",
+                "Pulmonary Embolism"
+            ],
+            anatomy: [
+                "Three Lobes: Superior, middle, and inferior lobes, separated by horizontal and oblique fissures.",
+                "Bronchial Tree: Division of primary, secondary, and tertiary bronchi.",
+                "Alveoli: Millions of capillary-wrapped sacs performing gas exchange."
+            ],
+            vitals: {
+                oxygen: "Oxygen Saturation: 98%",
+                respRate: "Respiratory Rate: 16 br/min",
+                lungStatus: "Lung Status: Clear Bilaterally"
+            }
+        },
+        liver: {
+            name: "Liver",
+            badge: "Gastrointestinal / Endocrine",
+            description: "The largest internal organ and gland in the human body, performing hundreds of essential metabolic functions.",
+            functions: [
+                "Metabolizes proteins, lipids, and carbohydrates.",
+                "Detoxifies chemicals, metabolizes drugs, and filters blood from the digestive tract.",
+                "Produces bile essential for lipid emulsification and absorption.",
+                "Stores glycogen, vitamins (A, D, E, K), and essential minerals."
+            ],
+            conditions: [
+                "Cirrhosis and Fatty Liver Disease (NAFLD)",
+                "Hepatitis (A, B, C)",
+                "Hepatocellular Carcinoma (Liver Cancer)",
+                "Jaundice and Hemochromatosis"
+            ],
+            anatomy: [
+                "Lobes: Divided into a large right lobe, a smaller left lobe, and caudate/quadrate lobes.",
+                "Hepatic Portal System: Receives nutrient-rich blood directly from the stomach and intestines.",
+                "Hepatocytes: Specialized cells performing the metabolic, endocrine, and secretory functions."
+            ],
+            vitals: {
+                liverFunction: "Liver Function: Normal (AST/ALT in range)",
+                status: "Status: Unobstructed"
+            }
+        },
+        stomach: {
+            name: "Stomach",
+            badge: "Gastrointestinal",
+            description: "A J-shaped muscular organ that receives food from the esophagus, acting as a temporary storage and digestion chamber.",
+            functions: [
+                "Mechanically churns food, mixing it with gastric juices to form chyme.",
+                "Initiates protein digestion using pepsin and hydrochloric acid.",
+                "Gradually releases digested chyme into the duodenum.",
+                "Destroys ingested pathogens via highly acidic environment."
+            ],
+            conditions: [
+                "Gastritis and Peptic Ulcer Disease",
+                "Gastroesophageal Reflux Disease (GERD)",
+                "Gastroparesis",
+                "Stomach Cancer"
+            ],
+            anatomy: [
+                "Cardia, Fundus, Body, and Pylorus: The four main structural regions.",
+                "Rugae: Muscular internal folds that stretch to expand the stomach's volume.",
+                "Pyloric Sphincter: A muscular valve controlling chyme outflow into the small intestine."
+            ],
+            vitals: {
+                digestiveStatus: "Digestive Status: Active peristalsis",
+                status: "Status: Normal pH"
+            }
+        }
+    };
+
+    // Label mapping helper for displaying organ vitals dynamically
+    const vitalsLabels = {
+        rate: 'Heart Rate',
+        pressure: 'Blood Pressure',
+        oxygen: 'Oxygen Saturation',
+        respRate: 'Respiratory Rate',
+        cardiacStatus: 'Cardiac Status',
+        lungStatus: 'Lung Status',
+        neuroStatus: 'Neurological Status',
+        consciousness: 'Consciousness Level',
+        liverFunction: 'Liver Function',
+        digestiveStatus: 'Digestive Status',
+        status: 'Status'
+    };
+
     // Update the information side panel
     function updateInfoPanel(partId) {
         if (!infoPanelContent) return;
 
-        if (!partId || !bodyPartKnowledge[partId]) {
+        const data = currentViewMode === 'body' ? bodyPartKnowledge[partId] : organKnowledge[partId];
+        const activeColors = currentViewMode === 'body' ? bodyPartColors : organColors;
+
+        if (!partId || !data) {
             infoPanelContent.innerHTML = `
                 <div class="info-placeholder">
                     <div class="pulse-icon">
@@ -248,16 +723,87 @@ document.addEventListener('DOMContentLoaded', () => {
                             <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                         </svg>
                     </div>
-                    <h3>Anatomy Explorer</h3>
-                    <p>Select a body part to view information.</p>
+                    <h3>${currentViewMode === 'body' ? 'Anatomy Explorer' : 'Organ Explorer'}</h3>
+                    <p>Select a ${currentViewMode === 'body' ? 'body part' : 'internal organ'} to view information.</p>
                 </div>
             `;
             return;
         }
 
-        const data = bodyPartKnowledge[partId];
-        const color = bodyPartColors[partId] || '#00f2fe';
-        const organsLabel = data.isOrgan ? 'Major Organs & Structures' : 'Muscles & Bones';
+        const color = activeColors[partId] || '#00f2fe';
+        
+        let organsOrAnatomyHtml = '';
+        if (currentViewMode === 'body') {
+            const organsLabel = data.isOrgan ? 'Major Organs & Structures' : 'Muscles & Bones';
+            organsOrAnatomyHtml = `
+                <div class="info-section">
+                    <h4>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                            <line x1="15" y1="3" x2="15" y2="21"></line>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                            <line x1="3" y1="15" x2="21" y2="15"></line>
+                        </svg>
+                        ${organsLabel}
+                    </h4>
+                    <ul>
+                        ${data.organs.map(o => `<li>${o}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        } else {
+            // Anatomy/Organ mode: show Anatomy Information
+            organsOrAnatomyHtml = `
+                <div class="info-section">
+                    <h4>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                            <line x1="15" y1="3" x2="15" y2="21"></line>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                            <line x1="3" y1="15" x2="21" y2="15"></line>
+                        </svg>
+                        Anatomy Information
+                    </h4>
+                    <ul>
+                        ${data.anatomy.map(a => `<li>${a}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Generate Vitals section if applicable
+        let vitalsHtml = '';
+        if (currentViewMode === 'anatomy' && data.vitals) {
+            vitalsHtml = `
+                <div class="info-section">
+                    <h4>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                        </svg>
+                        Clinical Vitals (Demo)
+                    </h4>
+                    <div class="vitals-container">
+                        <div class="vitals-grid">
+                            ${Object.entries(data.vitals).map(([key, value]) => {
+                                const title = vitalsLabels[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                                const displayValue = value.includes(': ') ? value.split(': ')[1] : value;
+                                return `
+                                    <div class="vitals-card">
+                                        <span class="vitals-card-title">${title}</span>
+                                        <span class="vitals-card-value">${displayValue}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        <p class="vitals-disclaimer">
+                            Current PulseVision AI uses pose estimation only. Real vitals require medical sensors or specialized physiological monitoring models.
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
 
         infoPanelContent.innerHTML = `
             <div class="info-details">
@@ -291,21 +837,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </ul>
                 </div>
                 
-                <div class="info-section">
-                    <h4>
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="9" y1="3" x2="9" y2="21"></line>
-                            <line x1="15" y1="3" x2="15" y2="21"></line>
-                            <line x1="3" y1="9" x2="21" y2="9"></line>
-                            <line x1="3" y1="15" x2="21" y2="15"></line>
-                        </svg>
-                        ${organsLabel}
-                    </h4>
-                    <ul>
-                        ${data.organs.map(o => `<li>${o}</li>`).join('')}
-                    </ul>
-                </div>
+                ${organsOrAnatomyHtml}
                 
                 <div class="info-section">
                     <h4>
@@ -320,6 +852,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${data.conditions.map(c => `<li>${c}</li>`).join('')}
                     </ul>
                 </div>
+
+                ${vitalsHtml}
             </div>
         `;
     }
@@ -329,19 +863,34 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedBodyPart = partId;
         updateInfoPanel(partId);
 
-        // Update static image bboxes
-        document.querySelectorAll('.coord-highlight-box').forEach(box => {
-            box.classList.remove('selected');
-        });
-        const selectedBox = document.getElementById(`highlight-${partId}`);
-        if (selectedBox) {
-            selectedBox.classList.add('selected');
+        // Update static image bboxes and overlays
+        if (latestApiResponse && latestApiResponse.coordinates) {
+            positionAllBboxes(latestApiResponse.coordinates);
         }
 
         // Highlight table row
         document.querySelectorAll('#metrics-table tbody tr').forEach(row => {
             row.classList.remove('selected-row');
             if (row.dataset.partId === partId) {
+                row.classList.add('selected-row');
+            }
+        });
+    }
+
+    // Select organ and update UI states
+    function selectOrgan(organId) {
+        selectedOrgan = organId;
+        updateInfoPanel(organId);
+
+        // Update static image bboxes and overlays
+        if (latestApiResponse && latestApiResponse.coordinates) {
+            positionAllBboxes(latestApiResponse.coordinates);
+        }
+
+        // Highlight table row
+        document.querySelectorAll('#metrics-table tbody tr').forEach(row => {
+            row.classList.remove('selected-row');
+            if (row.dataset.partId === organId) {
                 row.classList.add('selected-row');
             }
         });
@@ -354,42 +903,88 @@ document.addEventListener('DOMContentLoaded', () => {
         if (width === 0 || height === 0) return;
 
         const bodyParts = ['head', 'chest', 'left_arm', 'right_arm', 'left_leg', 'right_leg'];
-        bodyParts.forEach(partId => {
-            const highlightBox = document.getElementById(`highlight-${partId}`);
-            if (!highlightBox) return;
+        const organs = ['brain', 'heart', 'left_lung', 'right_lung', 'liver', 'stomach'];
 
-            const bbox = coordinates[partId];
-            if (bbox) {
-                const [x1, y1, x2, y2] = bbox;
-                const leftPercent = (x1 / width) * 100;
-                const topPercent = (y1 / height) * 100;
-                const widthPercent = ((x2 - x1) / width) * 100;
-                const heightPercent = ((y2 - y1) / height) * 100;
+        const anatomyOverlay = document.getElementById('anatomy-overlay');
+        const coordHighlights = document.getElementById('coord-highlights');
 
-                highlightBox.style.left = `${leftPercent}%`;
-                highlightBox.style.top = `${topPercent}%`;
-                highlightBox.style.width = `${widthPercent}%`;
-                highlightBox.style.height = `${heightPercent}%`;
-                
-                const colorHex = bodyPartColors[partId] || '#00f2fe';
-                highlightBox.style.setProperty('--part-color', colorHex);
-                highlightBox.style.borderColor = colorHex;
-                
-                highlightBox.classList.add('detected');
-                if (selectedBodyPart === partId) {
-                    highlightBox.classList.add('selected');
-                } else {
-                    highlightBox.classList.remove('selected');
-                }
-            } else {
-                highlightBox.classList.remove('detected', 'selected');
+        if (currentViewMode === 'body') {
+            // Body Mode active: show boxes, hide organ overlays
+            if (anatomyOverlay) {
+                anatomyOverlay.classList.remove('active');
+                anatomyOverlay.innerHTML = '';
             }
-        });
+            if (coordHighlights) {
+                coordHighlights.classList.add('active');
+            }
+
+            // Disable and hide inactive (organs)
+            organs.forEach(partId => {
+                const highlightBox = document.getElementById(`highlight-${partId}`);
+                if (highlightBox) {
+                    highlightBox.classList.remove('detected', 'selected');
+                }
+            });
+
+            // Position and display active body parts
+            bodyParts.forEach(partId => {
+                const highlightBox = document.getElementById(`highlight-${partId}`);
+                if (!highlightBox) return;
+
+                const bbox = coordinates[partId];
+                if (bbox) {
+                    const [x1, y1, x2, y2] = bbox;
+                    const leftPercent = (x1 / width) * 100;
+                    const topPercent = (y1 / height) * 100;
+                    const widthPercent = ((x2 - x1) / width) * 100;
+                    const heightPercent = ((y2 - y1) / height) * 100;
+
+                    highlightBox.style.left = `${leftPercent}%`;
+                    highlightBox.style.top = `${topPercent}%`;
+                    highlightBox.style.width = `${widthPercent}%`;
+                    highlightBox.style.height = `${heightPercent}%`;
+                    
+                    const colorHex = bodyPartColors[partId] || '#00f2fe';
+                    highlightBox.style.setProperty('--part-color', colorHex);
+                    highlightBox.style.borderColor = colorHex;
+                    
+                    highlightBox.classList.add('detected');
+                    if (selectedBodyPart === partId) {
+                        highlightBox.classList.add('selected');
+                    } else {
+                        highlightBox.classList.remove('selected');
+                    }
+                } else {
+                    highlightBox.classList.remove('detected', 'selected');
+                }
+            });
+        } else {
+            // Anatomy Mode active: hide boxes, render organ overlays
+            if (coordHighlights) {
+                coordHighlights.classList.remove('active');
+                // Hide all bounding box highlights
+                bodyParts.concat(organs).forEach(partId => {
+                    const highlightBox = document.getElementById(`highlight-${partId}`);
+                    if (highlightBox) {
+                        highlightBox.classList.remove('detected', 'selected');
+                    }
+                });
+            }
+
+            if (anatomyOverlay) {
+                anatomyOverlay.classList.add('active');
+                // Render DOM elements using OrganOverlay helper
+                organOverlay.renderDOM(anatomyOverlay, coordinates, width, height, selectedOrgan, (clickedOrganId) => {
+                    selectOrgan(clickedOrganId);
+                });
+            }
+        }
     }
 
     // Reset selected states
     function resetSelectedBodyPart() {
         selectedBodyPart = null;
+        selectedOrgan = null;
         updateInfoPanel(null);
         document.querySelectorAll('.coord-highlight-box').forEach(box => {
             box.classList.remove('selected', 'detected');
@@ -435,6 +1030,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Mode Switching Logic
     modeUploadBtn.addEventListener('click', () => switchMode('upload'));
     modeWebcamBtn.addEventListener('click', () => switchMode('webcam'));
+
+    // View Mode Toggle Listeners
+    viewModeBodyBtn.addEventListener('click', () => switchViewMode('body'));
+    viewModeAnatomyBtn.addEventListener('click', () => switchViewMode('anatomy'));
+
+    function switchViewMode(mode) {
+        if (currentViewMode === mode) return;
+        currentViewMode = mode;
+
+        if (mode === 'body') {
+            viewModeBodyBtn.classList.add('active');
+            viewModeAnatomyBtn.classList.remove('active');
+        } else {
+            viewModeAnatomyBtn.classList.add('active');
+            viewModeBodyBtn.classList.remove('active');
+            organOverlay.startFade();
+        }
+
+        // Reset selections to avoid visual mismatches
+        resetSelectedBodyPart();
+
+        // If we have active coordinates (e.g. from static image results or active webcam results), refresh the UI
+        if (latestApiResponse && latestApiResponse.coordinates) {
+            setupTable(latestApiResponse.coordinates);
+            positionAllBboxes(latestApiResponse.coordinates);
+        }
+    }
 
     function switchMode(mode) {
         if (currentMode === mode) return;
@@ -656,6 +1278,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (xMax > xMin && yMax > yMin) {
                 currentCoordinates[part] = [xMin, yMin, xMax, yMax];
+            }
+        }
+
+        // Live update the table coordinate logs and canvas highlights based on View Mode
+        if (currentViewMode === 'body') {
+            for (const [part, bbox] of Object.entries(currentCoordinates)) {
+                const xMin = bbox[0];
+                const yMin = bbox[1];
+                const xMax = bbox[2];
+                const yMax = bbox[3];
                 const color = bodyPartColors[part];
 
                 const isSelected = part === selectedBodyPart;
@@ -703,9 +1335,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillStyle = '#ffffff';
                 ctx.fillText(labelText, xMin + 5, textY);
             }
+        } else {
+            // Anatomy Mode: Draw translucent organ images on Canvas
+            organOverlay.renderCanvas(ctx, currentCoordinates, width, height, selectedOrgan);
         }
 
-        // Live update the table coordinate logs
         latestApiResponse = { coordinates: currentCoordinates };
         setupTable(currentCoordinates);
     }
@@ -996,12 +1630,33 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 'right_leg', label: 'Right Leg' }
         ];
 
-        bodyParts.forEach(part => {
+        const organs = [
+            { id: 'brain', label: 'Brain' },
+            { id: 'heart', label: 'Heart' },
+            { id: 'left_lung', label: 'Left Lung' },
+            { id: 'right_lung', label: 'Right Lung' },
+            { id: 'liver', label: 'Liver' },
+            { id: 'stomach', label: 'Stomach' }
+        ];
+
+        const activeParts = currentViewMode === 'body' ? bodyParts : organs;
+        const activeCoords = currentViewMode === 'body' ? coordinates : getOrganCoordinates(coordinates);
+        const activeColors = currentViewMode === 'body' ? bodyPartColors : organColors;
+        const selectedId = currentViewMode === 'body' ? selectedBodyPart : selectedOrgan;
+
+        // Dynamic Localization Rate Counter
+        const totalDetected = Object.keys(activeCoords).length;
+        if (detectionCount) {
+            detectionCount.innerHTML = `${totalDetected}/6 <span>${currentViewMode === 'body' ? 'regions' : 'organs'} mapped</span>`;
+            detectionCount.style.color = totalDetected === 0 ? 'var(--accent-red)' : 'var(--accent-teal)';
+        }
+
+        activeParts.forEach(part => {
             const tr = document.createElement('tr');
             tr.dataset.partId = part.id;
             
-            const isDetected = coordinates[part.id] !== undefined && coordinates[part.id] !== null;
-            const bbox = isDetected ? coordinates[part.id] : null;
+            const isDetected = activeCoords[part.id] !== undefined && activeCoords[part.id] !== null;
+            const bbox = isDetected ? activeCoords[part.id] : null;
             
             const nameTd = document.createElement('td');
             nameTd.className = 'part-cell';
@@ -1022,15 +1677,19 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.appendChild(statusTd);
             
             // Highlight row if currently selected
-            if (part.id === selectedBodyPart) {
+            if (part.id === selectedId) {
                 tr.classList.add('selected-row');
-                tr.style.setProperty('--part-color', bodyPartColors[part.id]);
+                tr.style.setProperty('--part-color', activeColors[part.id]);
             }
 
             // Click interaction
             if (isDetected) {
                 tr.addEventListener('click', () => {
-                    selectBodyPart(part.id);
+                    if (currentViewMode === 'body') {
+                        selectBodyPart(part.id);
+                    } else {
+                        selectOrgan(part.id);
+                    }
                 });
                 
                 // Hover highlights (Only when static results are displayed)
@@ -1127,11 +1786,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.coord-highlight-box').forEach(box => {
         const partId = box.id.replace('highlight-', '');
         box.addEventListener('click', () => {
-            selectBodyPart(partId);
+            if (currentViewMode === 'body') {
+                selectBodyPart(partId);
+            } else {
+                selectOrgan(partId);
+            }
         });
     });
 
-    // Ray-cast click events on the Live Webcam Canvas to select body parts
+    // Ray-cast click events on the Live Webcam Canvas to select body parts or organs
     webcamCanvas.addEventListener('click', (e) => {
         if (currentMode !== 'webcam' || !isWebcamStreaming) return;
         if (!latestApiResponse || !latestApiResponse.coordinates) return;
@@ -1141,10 +1804,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const clickX = ((e.clientX - rect.left) / rect.width) * webcamCanvas.width;
         const clickY = ((e.clientY - rect.top) / rect.height) * webcamCanvas.height;
 
+        const bodyParts = ['head', 'chest', 'left_arm', 'right_arm', 'left_leg', 'right_leg'];
+        const organs = ['brain', 'heart', 'left_lung', 'right_lung', 'liver', 'stomach'];
+
+        const activeSet = currentViewMode === 'body' ? bodyParts : organs;
+        const activeCoords = currentViewMode === 'body' ? latestApiResponse.coordinates : getOrganCoordinates(latestApiResponse.coordinates);
+
         let clickedPart = null;
-        const parts = ['head', 'chest', 'left_arm', 'right_arm', 'left_leg', 'right_leg'];
-        for (const part of parts) {
-            const bbox = latestApiResponse.coordinates[part];
+        for (const part of activeSet) {
+            const bbox = activeCoords[part];
             if (bbox) {
                 const [x1, y1, x2, y2] = bbox;
                 if (clickX >= x1 && clickX <= x2 && clickY >= y1 && clickY <= y2) {
@@ -1155,7 +1823,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (clickedPart) {
-            selectBodyPart(clickedPart);
+            if (currentViewMode === 'body') {
+                selectBodyPart(clickedPart);
+            } else {
+                selectOrgan(clickedPart);
+            }
         }
     });
 });
