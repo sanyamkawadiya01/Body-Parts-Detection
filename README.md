@@ -1,9 +1,6 @@
-<<<<<<< HEAD
-# PulseVision AI - Patient Body-Part Localization Dashboard
+# PulseVision AI - Patient Body-Part Localization & Vitals Dashboard
 
-PulseVision AI is a lightweight, high-performance web application designed to automatically detect and map anatomical body regions from standard patient photographs. Leveraging MediaPipe Pose and OpenCV, it provides bounding box coordinates and visualized diagnostic overlays.
-
-Developed with a sleek, dark-themed clinical dashboard, the application is designed to be easily integrated into broader healthcare systems (such as PACS, EHR portals, or telehealth platforms).
+PulseVision AI is a lightweight, high-performance web application designed to automatically detect and map anatomical body regions from standard patient photographs, evaluate patient vital signs using clinical rule thresholds, and generate clinician-ready clinical insights using a local LLM.
 
 ---
 
@@ -11,13 +8,12 @@ Developed with a sleek, dark-themed clinical dashboard, the application is desig
 
 - **MediaPipe Pose Tracking**: Employs Google's MediaPipe Pose model to locate 33 key physical joints (landmarks) on the patient.
 - **Dynamic Bounding Boxes**: Automatically groups joints anatomically into six major regions:
-  - **Head** (Nose, eyes, ears, mouth)
-  - **Chest / Torso** (Shoulders and hips)
-  - **Left / Right Arms** (Shoulder, elbow, wrist, hand landmarks)
-  - **Left / Right Legs** (Hip, knee, ankle, heel, toe landmarks)
-- **Clinical Aesthetics**: Features a modern web app dashboard built using glassmorphism, glowing telemetry accents, step-by-step progress tracking, and interactive tables.
-- **Robust Out-of-Frame Handling**: Checks visibility statistics for each region. If the patient is captured in a close-up or portrait shot, out-of-frame limbs are automatically labeled as `NOT DETECTED` rather than drawing erroneous estimations.
-- **Developer API Integration**: Returns a standardized JSON coordinate payload mapping bounding box vertices `[x1, y1, x2, y2]`.
+  - **Head**, **Chest / Torso**, **Left / Right Arms**, and **Left / Right Legs**.
+- **Rule-Based Vitals Evaluation**: Evaluates patient vital signs (heart rate, blood pressure, oxygen saturation, temperature, respiratory rate) against clinical thresholds to immediately flag abnormal readings.
+- **Local LLM-Powered Insights**: Integrates with local Ollama service (`llama3.1:8b`, etc.) to produce clinician summaries, risk level classifications, and monitoring suggestions with zero cloud requirements.
+- **Robust Failover System**: Automatically falls back to local rule-based clinical insights if Ollama is offline or unreachable.
+- **Clinical Aesthetics**: Features a modern web app dashboard built using glassmorphism, glowing telemetry accents, real-time webcam telemetry, and AI vitals analysis panels.
+- **Developer API Integration**: Exposes endpoints `/detect` for pose coordinates and `/analyze-vitals` for local LLM vitals diagnostics.
 
 ---
 
@@ -28,6 +24,15 @@ project/
 ├── app.py                      # Flask main server application
 ├── requirements.txt            # Python package dependencies
 ├── README.md                   # This instruction manual
+├── LLM_VITALS_GUIDE.md         # Local LLM Vitals Integration Manual
+├── backend/                    # Modular vitals & LLM services
+│   ├── config/
+│   │   └── vitals_thresholds.py # Configurable vitals range thresholds
+│   ├── services/
+│   │   ├── vitals_analysis_service.py # Rule-based vitals checker
+│   │   └── llm_service.py      # Ollama local LLM integration
+│   └── routes/
+│       └── vitals_routes.py    # POST /analyze-vitals blueprint route
 ├── uploads/                    # Sandbox folder for raw uploads
 ├── outputs/                    # Sandbox folder for annotated outcomes
 ├── static/
@@ -122,5 +127,3 @@ To integrate this utility into a larger healthcare environment (like a telehealt
    The generated annotated outputs can be converted into standard DICOM images using Python libraries like `pydicom` and uploaded to a hospital's PACS server for medical records keeping.
 4. **Security & HIPAA Compliance**:
    Ensure patient photographs are transmitted over secure HTTPS channels, and implement authentication tokens (JWT or session keys) on the `/detect` endpoint. In production, configure automatic deletion policies on the `uploads/` and `outputs/` directories to prevent retaining Protected Health Information (PHI) longer than required.
-   
->>>>>>> ac1e028202f89cd1bdca06eb0ab65ebb57e8bea4

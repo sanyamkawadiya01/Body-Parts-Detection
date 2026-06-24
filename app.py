@@ -3,8 +3,12 @@ from werkzeug.utils import secure_filename
 import os
 import uuid
 from detector.pose_detector import PoseDetector
+from backend.routes.vitals_routes import vitals_bp
 
 app = Flask(__name__)
+
+# Register Blueprints
+app.register_blueprint(vitals_bp)
 
 # Configure directories
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
