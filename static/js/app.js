@@ -152,6 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Ensure container is empty
             container.innerHTML = '';
 
+            // Check if organ projections should be shown
+            if (!organProjectionEnabled) return;
+
             const organsList = ['left_lung', 'right_lung', 'liver', 'stomach', 'heart', 'brain'];
             const organCoords = getOrganCoordinates(coordinates);
 
@@ -200,6 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Render for live webcam on Canvas
         renderCanvas(ctx, coordinates, canvasWidth, canvasHeight, selectedOrganId) {
             if (!this.loaded) return;
+
+            // Check if organ projections should be shown
+            if (!organProjectionEnabled) return;
 
             const organsList = ['left_lung', 'right_lung', 'liver', 'stomach', 'heart', 'brain'];
             const organCoords = getOrganCoordinates(coordinates);
@@ -275,8 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const webcamMessage = document.getElementById('webcam-message');
     const captureBtn = document.getElementById('capture-btn');
     const liveTelemetryPlaceholder = document.getElementById('live-telemetry-placeholder');
-    const viewModeBodyBtn = document.getElementById('view-mode-body-btn');
-    const viewModeAnatomyBtn = document.getElementById('view-mode-anatomy-btn');
+    const organProjectionToggle = document.getElementById('organProjectionToggle');
 
     // UI Panel States
     const emptyState = document.getElementById('empty-state');
@@ -311,8 +316,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let originalImageDimensions = { width: 0, height: 0 };
     let currentMode = 'upload'; // 'upload' or 'webcam'
     let selectedBodyPart = null;
-    let currentViewMode = 'body'; // 'body' or 'anatomy'
-    let selectedOrgan = null;
+    let selectedOrgan = null; // Storing selected organ for info panel details
+    let organProjectionEnabled = false; // Flag to show (true) or hide (false) organ projections
     const organOverlay = new OrganOverlay();
     organOverlay.preload().catch(err => console.error("Preloading organs failed", err));
     
@@ -712,8 +717,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateInfoPanel(partId) {
         if (!infoPanelContent) return;
 
-        const data = currentViewMode === 'body' ? bodyPartKnowledge[partId] : organKnowledge[partId];
-        const activeColors = currentViewMode === 'body' ? bodyPartColors : organColors;
+        const data = !organProjectionEnabled ? bodyPartKnowledge[partId] : organKnowledge[partId];
+        const activeColors = !organProjectionEnabled ? bodyPartColors : organColors;
 
         if (!partId || !data) {
             infoPanelContent.innerHTML = `
@@ -723,8 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                         </svg>
                     </div>
-                    <h3>${currentViewMode === 'body' ? 'Anatomy Explorer' : 'Organ Explorer'}</h3>
-                    <p>Select a ${currentViewMode === 'body' ? 'body part' : 'internal organ'} to view information.</p>
+                    <h3>${!organProjectionEnabled ? 'Anatomy Explorer' : 'Organ Explorer'}</h3>
+                    <p>Select a ${!organProjectionEnabled ? 'body part' : 'internal organ'} to view information.</p>
                 </div>
             `;
             return;
@@ -733,7 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const color = activeColors[partId] || '#00f2fe';
         
         let organsOrAnatomyHtml = '';
-        if (currentViewMode === 'body') {
+        if (!organProjectionEnabled) {
             const organsLabel = data.isOrgan ? 'Major Organs & Structures' : 'Muscles & Bones';
             organsOrAnatomyHtml = `
                 <div class="info-section">
@@ -775,7 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Generate Vitals section if applicable
         let vitalsHtml = '';
-        if (currentViewMode === 'anatomy' && data.vitals) {
+        if (organProjectionEnabled && data.vitals) {
             vitalsHtml = `
                 <div class="info-section">
                     <h4>
@@ -908,8 +913,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const anatomyOverlay = document.getElementById('anatomy-overlay');
         const coordHighlights = document.getElementById('coord-highlights');
 
-        if (currentViewMode === 'body') {
-            // Body Mode active: show boxes, hide organ overlays
+        // Render body-part bounding boxes when Organ Projection is disabled (OFF)
+        if (!organProjectionEnabled) {
+            // Organ Projection OFF: show boxes, hide organ overlays
             if (anatomyOverlay) {
                 anatomyOverlay.classList.remove('active');
                 anatomyOverlay.innerHTML = '';
@@ -959,7 +965,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         } else {
-            // Anatomy Mode active: hide boxes, render organ overlays
+            // Organ Projection ON: hide boxes, render organ overlays
             if (coordHighlights) {
                 coordHighlights.classList.remove('active');
                 // Hide all bounding box highlights
@@ -1031,31 +1037,29 @@ document.addEventListener('DOMContentLoaded', () => {
     modeUploadBtn.addEventListener('click', () => switchMode('upload'));
     modeWebcamBtn.addEventListener('click', () => switchMode('webcam'));
 
-    // View Mode Toggle Listeners
-    viewModeBodyBtn.addEventListener('click', () => switchViewMode('body'));
-    viewModeAnatomyBtn.addEventListener('click', () => switchViewMode('anatomy'));
+    // Organ Projection Toggle Listener
+    if (organProjectionToggle) {
+        organProjectionToggle.addEventListener('click', () => {
+            organProjectionEnabled = !organProjectionEnabled;
 
-    function switchViewMode(mode) {
-        if (currentViewMode === mode) return;
-        currentViewMode = mode;
+            if (organProjectionEnabled) {
+                organProjectionToggle.classList.add('active');
+                organProjectionToggle.textContent = 'Organ Projection: ON';
+                organOverlay.startFade();
+            } else {
+                organProjectionToggle.classList.remove('active');
+                organProjectionToggle.textContent = 'Organ Projection: OFF';
+            }
 
-        if (mode === 'body') {
-            viewModeBodyBtn.classList.add('active');
-            viewModeAnatomyBtn.classList.remove('active');
-        } else {
-            viewModeAnatomyBtn.classList.add('active');
-            viewModeBodyBtn.classList.remove('active');
-            organOverlay.startFade();
-        }
+            // Reset selections to avoid visual mismatches
+            resetSelectedBodyPart();
 
-        // Reset selections to avoid visual mismatches
-        resetSelectedBodyPart();
-
-        // If we have active coordinates (e.g. from static image results or active webcam results), refresh the UI
-        if (latestApiResponse && latestApiResponse.coordinates) {
-            setupTable(latestApiResponse.coordinates);
-            positionAllBboxes(latestApiResponse.coordinates);
-        }
+            // Refresh UI if we have active coordinates (from static image or webcam)
+            if (latestApiResponse && latestApiResponse.coordinates) {
+                setupTable(latestApiResponse.coordinates);
+                positionAllBboxes(latestApiResponse.coordinates);
+            }
+        });
     }
 
     function switchMode(mode) {
@@ -1281,8 +1285,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Live update the table coordinate logs and canvas highlights based on View Mode
-        if (currentViewMode === 'body') {
+        // Live update the table coordinate logs and canvas highlights based on toggle state
+        if (!organProjectionEnabled) {
             for (const [part, bbox] of Object.entries(currentCoordinates)) {
                 const xMin = bbox[0];
                 const yMin = bbox[1];
@@ -1336,7 +1340,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillText(labelText, xMin + 5, textY);
             }
         } else {
-            // Anatomy Mode: Draw translucent organ images on Canvas
+            // Organ Projection ON: Draw translucent organ images on Canvas
             organOverlay.renderCanvas(ctx, currentCoordinates, width, height, selectedOrgan);
         }
 
@@ -1639,15 +1643,15 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 'stomach', label: 'Stomach' }
         ];
 
-        const activeParts = currentViewMode === 'body' ? bodyParts : organs;
-        const activeCoords = currentViewMode === 'body' ? coordinates : getOrganCoordinates(coordinates);
-        const activeColors = currentViewMode === 'body' ? bodyPartColors : organColors;
-        const selectedId = currentViewMode === 'body' ? selectedBodyPart : selectedOrgan;
+        const activeParts = !organProjectionEnabled ? bodyParts : organs;
+        const activeCoords = !organProjectionEnabled ? coordinates : getOrganCoordinates(coordinates);
+        const activeColors = !organProjectionEnabled ? bodyPartColors : organColors;
+        const selectedId = !organProjectionEnabled ? selectedBodyPart : selectedOrgan;
 
         // Dynamic Localization Rate Counter
         const totalDetected = Object.keys(activeCoords).length;
         if (detectionCount) {
-            detectionCount.innerHTML = `${totalDetected}/6 <span>${currentViewMode === 'body' ? 'regions' : 'organs'} mapped</span>`;
+            detectionCount.innerHTML = `${totalDetected}/6 <span>${!organProjectionEnabled ? 'regions' : 'organs'} mapped</span>`;
             detectionCount.style.color = totalDetected === 0 ? 'var(--accent-red)' : 'var(--accent-teal)';
         }
 
@@ -1685,7 +1689,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Click interaction
             if (isDetected) {
                 tr.addEventListener('click', () => {
-                    if (currentViewMode === 'body') {
+                    if (!organProjectionEnabled) {
                         selectBodyPart(part.id);
                     } else {
                         selectOrgan(part.id);
@@ -1786,9 +1790,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.coord-highlight-box').forEach(box => {
         const partId = box.id.replace('highlight-', '');
         box.addEventListener('click', () => {
-            if (currentViewMode === 'body') {
+            // Determine active selection by knowledge base definition to avoid view-mode mismatch
+            if (bodyPartKnowledge[partId]) {
                 selectBodyPart(partId);
-            } else {
+            } else if (organKnowledge[partId]) {
                 selectOrgan(partId);
             }
         });
@@ -1807,8 +1812,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const bodyParts = ['head', 'chest', 'left_arm', 'right_arm', 'left_leg', 'right_leg'];
         const organs = ['brain', 'heart', 'left_lung', 'right_lung', 'liver', 'stomach'];
 
-        const activeSet = currentViewMode === 'body' ? bodyParts : organs;
-        const activeCoords = currentViewMode === 'body' ? latestApiResponse.coordinates : getOrganCoordinates(latestApiResponse.coordinates);
+        // Determine if canvas is currently showing body parts or organ projections
+        const showBodyPartsOnCanvas = !organProjectionEnabled;
+        const activeSet = showBodyPartsOnCanvas ? bodyParts : organs;
+        const activeCoords = showBodyPartsOnCanvas ? latestApiResponse.coordinates : getOrganCoordinates(latestApiResponse.coordinates);
 
         let clickedPart = null;
         for (const part of activeSet) {
@@ -1823,7 +1830,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (clickedPart) {
-            if (currentViewMode === 'body') {
+            if (showBodyPartsOnCanvas) {
                 selectBodyPart(clickedPart);
             } else {
                 selectOrgan(clickedPart);
