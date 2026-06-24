@@ -1837,4 +1837,164 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // --- Patient Vitals Insights Logic ---
+    const vitalsForm = document.getElementById('vitals-form');
+    const vitalsEmptyState = document.getElementById('vitals-empty-state');
+    const vitalsLoadingState = document.getElementById('vitals-loading-state');
+    const vitalsErrorState = document.getElementById('vitals-error-state');
+    const vitalsErrorMsg = document.getElementById('vitals-error-msg');
+    const vitalsResultsState = document.getElementById('vitals-results-state');
+    const vitalsRetryBtn = document.getElementById('vitals-retry-btn');
+    
+    // Results elements
+    const vitalsRiskLevel = document.getElementById('vitals-risk-level');
+    const vitalsLlmBadge = document.getElementById('vitals-llm-badge');
+    const vitalsSummaryText = document.getElementById('vitals-summary-text');
+    const vitalsObservationsList = document.getElementById('vitals-observations-list');
+    const vitalsRecommendationsList = document.getElementById('vitals-recommendations-list');
+
+    if (vitalsForm) {
+        vitalsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await runVitalsAnalysis();
+        });
+    }
+
+    if (vitalsRetryBtn) {
+        vitalsRetryBtn.addEventListener('click', async () => {
+            await runVitalsAnalysis();
+        });
+    }
+
+    async function runVitalsAnalysis() {
+        if (!vitalsForm) return;
+
+        // 1. Gather form values
+        const formData = new FormData(vitalsForm);
+        const payload = {};
+        
+        const age = formData.get('age');
+        if (age && age.trim() !== '') payload.age = parseInt(age, 10);
+        
+        const gender = formData.get('gender');
+        if (gender && gender.trim() !== '') payload.gender = gender;
+        
+        const hr = formData.get('heart_rate');
+        if (hr && hr.trim() !== '') payload.heart_rate = parseInt(hr, 10);
+        
+        const sbp = formData.get('blood_pressure_systolic');
+        if (sbp && sbp.trim() !== '') payload.blood_pressure_systolic = parseInt(sbp, 10);
+        
+        const dbp = formData.get('blood_pressure_diastolic');
+        if (dbp && dbp.trim() !== '') payload.blood_pressure_diastolic = parseInt(dbp, 10);
+        
+        const spo2 = formData.get('oxygen_saturation');
+        if (spo2 && spo2.trim() !== '') payload.oxygen_saturation = parseInt(spo2, 10);
+        
+        const rr = formData.get('respiratory_rate');
+        if (rr && rr.trim() !== '') payload.respiratory_rate = parseInt(rr, 10);
+        
+        const temp = formData.get('temperature');
+        if (temp && temp.trim() !== '') payload.temperature = parseFloat(temp);
+
+        // 2. Validate at least one vital sign is provided
+        const vitalFields = ['heart_rate', 'blood_pressure_systolic', 'blood_pressure_diastolic', 'oxygen_saturation', 'respiratory_rate', 'temperature'];
+        const hasVitals = vitalFields.some(field => payload[field] !== undefined && payload[field] !== null);
+        
+        if (!hasVitals) {
+            showToast('Please enter at least one vital sign metric for analysis.', 'error');
+            return;
+        }
+
+        // 3. Switch UI to loading state
+        vitalsEmptyState.style.display = 'none';
+        vitalsResultsState.style.display = 'none';
+        vitalsErrorState.style.display = 'none';
+        vitalsLoadingState.style.display = 'flex';
+
+        try {
+            // 4. Send API POST request
+            const response = await fetch('/analyze-vitals', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || (data.details ? Object.values(data.details).join(', ') : 'Server error during vital analysis.'));
+            }
+
+            // 5. Populate findings and render UI results state
+            renderVitalsResults(data.analysis, data.llm_status);
+            
+            vitalsLoadingState.style.display = 'none';
+            vitalsResultsState.style.display = 'flex';
+            showToast('Patient vital signs analysis complete.', 'success');
+
+        } catch (error) {
+            console.error('Vitals analysis request failed:', error);
+            vitalsErrorMsg.textContent = error.message || 'An unexpected network error occurred.';
+            vitalsLoadingState.style.display = 'none';
+            vitalsErrorState.style.display = 'flex';
+            showToast('Vitals analysis failed.', 'error');
+        }
+    }
+
+    function renderVitalsResults(analysis, llmStatus) {
+        // Risk Level Badge Styling
+        const risk = (analysis.risk_level || 'Low').toLowerCase();
+        vitalsRiskLevel.textContent = analysis.risk_level || 'Low';
+        vitalsRiskLevel.className = 'risk-badge'; // Reset class
+        
+        if (risk === 'high') {
+            vitalsRiskLevel.classList.add('high');
+        } else if (risk === 'moderate') {
+            vitalsRiskLevel.classList.add('moderate');
+        } else {
+            vitalsRiskLevel.classList.add('low');
+        }
+
+        // Telemetry status badge
+        if (llmStatus === 'offline') {
+            vitalsLlmBadge.textContent = 'LLM: Fallback Engine';
+            vitalsLlmBadge.className = 'llm-telemetry-badge offline';
+        } else {
+            vitalsLlmBadge.textContent = 'LLM: Local AI Active';
+            vitalsLlmBadge.className = 'llm-telemetry-badge';
+        }
+
+        // Clinical Summary
+        vitalsSummaryText.textContent = analysis.summary || 'No summary generated.';
+
+        // Key Observations
+        vitalsObservationsList.innerHTML = '';
+        const observations = analysis.observations || [];
+        if (observations.length === 0) {
+            vitalsObservationsList.innerHTML = '<li>Vitals are stable and within standard physiological margins.</li>';
+        } else {
+            observations.forEach(obs => {
+                const li = document.createElement('li');
+                li.textContent = obs;
+                vitalsObservationsList.appendChild(li);
+            });
+        }
+
+        // Recommendations
+        vitalsRecommendationsList.innerHTML = '';
+        const recommendations = analysis.recommendations || [];
+        if (recommendations.length === 0) {
+            vitalsRecommendationsList.innerHTML = '<li>Continue standard patient monitoring.</li>';
+        } else {
+            recommendations.forEach(rec => {
+                const li = document.createElement('li');
+                li.textContent = rec;
+                vitalsRecommendationsList.appendChild(li);
+            });
+        }
+    }
 });

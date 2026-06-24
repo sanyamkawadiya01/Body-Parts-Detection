@@ -1445,5 +1445,340 @@ footer a:hover {
     z-index: 10 !important; /* Bring to front when selected */
 }
 
+/* --- Patient Vitals Form Styles --- */
+.vitals-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.vitals-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+@media (max-width: 480px) {
+    .vitals-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-family: var(--font-secondary);
+}
+
+.form-group input,
+.form-group select {
+    background: rgba(4, 6, 10, 0.4);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.75rem;
+    color: var(--text-primary);
+    font-family: var(--font-primary);
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.25s ease;
+}
+
+.form-group input::placeholder {
+    color: var(--text-muted);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 10px rgba(79, 172, 254, 0.2);
+    background: rgba(4, 6, 10, 0.7);
+}
+
+.form-group select option {
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+}
+
+/* --- AI Vitals Insight Wrapper & States --- */
+.vitals-insight-wrapper {
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    width: 100%;
+}
+
+/* Empty, Loading, and Error States */
+.vitals-empty-state,
+.vitals-loading-state,
+.vitals-error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    text-align: center;
+    padding: 2rem;
+    width: 100%;
+    animation: fadeIn 0.4s ease-out;
+}
+
+.vitals-empty-state svg,
+.vitals-error-state svg {
+    width: 48px;
+    height: 48px;
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 1.5;
+    fill: none;
+}
+
+.vitals-empty-state .pulse-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: rgba(0, 242, 254, 0.04);
+    border: 1px dashed rgba(0, 242, 254, 0.2);
+    color: var(--accent-teal);
+    animation: pulseSlow 3s infinite;
+}
+
+.vitals-empty-state h3,
+.vitals-loading-state h3,
+.vitals-error-state h3 {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.vitals-empty-state p,
+.vitals-loading-state p,
+.vitals-error-state p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-family: var(--font-secondary);
+    max-width: 320px;
+}
+
+.vitals-error-state svg {
+    stroke: var(--accent-red);
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.3));
+}
+
+.vitals-error-state h3 {
+    color: #ff8888;
+}
+
+.vitals-error-state .error-msg {
+    color: var(--text-secondary);
+}
+
+/* Spinner and Animation */
+.vitals-spinner-container {
+    position: relative;
+    width: 70px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vitals-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(79, 172, 254, 0.1);
+    border-top: 3px solid var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 2;
+}
+
+.vitals-spinner-container .pulse-ring {
+    width: 70px;
+    height: 70px;
+    border: 2px solid rgba(79, 172, 254, 0.2);
+    border-radius: 50%;
+    animation: pulseRing 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    position: absolute;
+    z-index: 1;
+}
+
+/* Results State Styles */
+.vitals-results-state {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.vitals-results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.85rem 1.25rem;
+}
+
+.risk-badge-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.vitals-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-family: var(--font-secondary);
+}
+
+.risk-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.risk-badge.low {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--accent-green);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.1);
+}
+
+.risk-badge.moderate {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.1);
+}
+
+.risk-badge.high {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--accent-red);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.1);
+}
+
+.llm-telemetry-badge {
+    font-family: var(--font-secondary);
+    font-size: 0.75rem;
+    color: var(--accent-teal);
+    background: rgba(0, 242, 254, 0.08);
+    border: 1px solid rgba(0, 242, 254, 0.15);
+    padding: 0.25rem 0.6rem;
+    border-radius: 8px;
+}
+
+.llm-telemetry-badge.offline {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.vitals-insight-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.vitals-result-section {
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 1.25rem;
+    transition: all 0.2s ease;
+}
+
+.vitals-result-section:hover {
+    border-color: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.vitals-result-section h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--accent-blue);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: var(--font-primary);
+}
+
+.vitals-result-section p {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.vitals-result-section ul {
+    list-style: none;
+    padding-left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.vitals-result-section ul li {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    position: relative;
+    padding-left: 1.25rem;
+    line-height: 1.5;
+    font-family: var(--font-secondary);
+}
+
+.vitals-result-section ul li::before {
+    content: "•";
+    color: var(--accent-teal);
+    font-weight: bold;
+    display: inline-block;
+    width: 1em;
+    margin-left: -1em;
+    position: absolute;
+    left: 1.25rem;
+}
+
+/* Vitals safety disclaimer style */
+.vitals-safety-disclaimer {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    padding: 1rem;
+    border-radius: 12px;
+    margin-top: 0.5rem;
+}
+
+.vitals-safety-disclaimer svg {
+    stroke: var(--accent-red);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.vitals-safety-disclaimer span {
+    font-size: 0.8rem;
+    color: #ffaaaa;
+    line-height: 1.4;
+    font-family: var(--font-secondary);
+}
+
 
 
