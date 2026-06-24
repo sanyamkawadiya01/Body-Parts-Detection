@@ -1235,50 +1235,57 @@ footer a:hover {
     font-weight: 500;
 }
 
-/* --- View Mode Switch Toggle (Body / Anatomy) --- */
-.view-mode-toggle-container {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 0.35rem;
+/* --- Organ Projection Toggle Button Styling --- */
+.projection-toggle-container {
     margin: 0.5rem 0 1rem 0;
+    width: 100%;
 }
 
-.view-mode-btn {
+.projection-toggle-btn {
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
-    color: var(--text-secondary);
-    padding: 0.6rem;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.25s ease;
-    font-family: var(--font-primary);
-}
-
-.view-mode-btn svg {
-    transition: stroke 0.25s ease;
-}
-
-.view-mode-btn:hover {
-    color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.view-mode-btn.active {
-    color: var(--accent-teal);
-    background: rgba(0, 242, 254, 0.08);
-    border: 1px solid rgba(0, 242, 254, 0.2);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    padding: 0.85rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
     font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-primary);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    
+    /* Default OFF state styling: muted glassmorphism */
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    box-shadow: none;
+}
+
+.projection-toggle-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+.projection-toggle-btn:active {
+    transform: translateY(1px);
+}
+
+/* ON state styling: glowing neon teal */
+.projection-toggle-btn.active {
+    background: rgba(0, 242, 254, 0.08);
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    color: var(--accent-teal);
+    box-shadow: 0 4px 15px rgba(0, 242, 254, 0.15), var(--glow-teal);
+    text-shadow: 0 0 8px rgba(0, 242, 254, 0.3);
+}
+
+.projection-toggle-btn.active:hover {
+    background: rgba(0, 242, 254, 0.12);
+    border-color: rgba(0, 242, 254, 0.45);
+    box-shadow: 0 6px 20px rgba(0, 242, 254, 0.25), var(--glow-teal);
 }
 
 /* --- Internal Organ Custom Color Variables & Dot Indicators --- */
@@ -1442,4 +1449,6 @@ footer a:hover {
     transform: scale(1.08);
     z-index: 10 !important; /* Bring to front when selected */
 }
+
+
 
