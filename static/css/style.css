@@ -168,21 +168,16 @@ header {
 /* Grid Layout */
 .main-grid {
     display: grid;
-    grid-template-columns: 1fr 1.3fr 0.9fr;
+    grid-template-columns: 1fr 1.3fr;
     gap: 2rem;
     flex-grow: 1;
 }
 
-@media (max-width: 1200px) {
-    .main-grid {
-        grid-template-columns: 1fr 1.2fr;
-    }
-    #info-panel {
-        grid-column: span 2;
-    }
+#info-panel {
+    grid-column: span 2;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
     .main-grid {
         grid-template-columns: 1fr;
     }
